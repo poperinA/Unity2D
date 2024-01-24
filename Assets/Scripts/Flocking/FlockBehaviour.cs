@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using System.Threading.Tasks;
 
 public class FlockBehaviour : MonoBehaviour
 {
@@ -179,32 +180,41 @@ public class FlockBehaviour : MonoBehaviour
   }
 
 
-  IEnumerator Coroutine_Flocking()
-  {
-    while (true)
+    IEnumerator Coroutine_Flocking()
     {
-      if (useFlocking)
-      {
-        foreach (Flock flock in flocks)
+        int tasksPerFrame = 10; // Adjust as needed
+
+        while (true)
         {
-          List<Autonomous> autonomousList = flock.mAutonomous;
-          for (int i = 0; i < autonomousList.Count; ++i)
-          {
-            Execute(flock, i);
-            if (i % BatchSize == 0)
+            if (useFlocking)
             {
-              yield return null;
+                foreach (var flock in flocks)
+                {
+                    List<Autonomous> autonomousList = flock.mAutonomous;
+
+                    for (int i = 0; i < autonomousList.Count; i += tasksPerFrame)
+                    {
+                        int endIndex = Mathf.Min(i + tasksPerFrame, autonomousList.Count);
+                        MainThreadDispatcher.Instance.Enqueue(() =>
+                        {
+                            for (int j = i; j < endIndex; j++)
+                            {
+                                Execute(flock, j);
+                            }
+                        });
+                    }
+                }
             }
-          }
-          yield return null;
+
+            yield return new WaitForSeconds(TickDuration);
         }
-      }
-      yield return new WaitForSeconds(TickDuration);
     }
-  }
 
 
-  void SeparationWithEnemies_Internal(
+
+
+
+    void SeparationWithEnemies_Internal(
     List<Autonomous> boids, 
     List<Autonomous> enemies, 
     float sepDist, 
