@@ -6,25 +6,25 @@ using System.Threading.Tasks;
 
 public class FlockBehaviour : MonoBehaviour
 {
+    //list of obstacles in the scene
     List<Obstacle> mObstacles = new List<Obstacle>();
 
-    [SerializeField]
-    GameObject[] Obstacles;
+    [SerializeField] GameObject[] Obstacles; //array of obstacle game objects
 
-    [SerializeField]
-    BoxCollider2D Bounds;
+    [SerializeField] BoxCollider2D Bounds; //boundary for the flocking simulation
 
+    //duration of ticks for different flocking behaviors
     public float TickDuration = 1.0f;
     public float TickDurationSeparationEnemy = 0.1f;
     public float TickDurationRandom = 1.0f;
 
-    public int BoidIncr = 100;
-    public bool useFlocking = false;
-    public int BatchSize = 100;
+    public int BoidIncr = 100; //increment for adding boids
+    public bool useFlocking = false; //toggle for flocking behavior
+    public int BatchSize = 100; //batch size for parallel execution
 
-    public List<Flock> flocks = new List<Flock>();
+    public List<Flock> flocks = new List<Flock>(); //list of flock configurations
 
-    [SerializeField] public SpatialPartitioning spatialPartitioning;
+    [SerializeField] public SpatialPartitioning spatialPartitioning; //reference to spatial partitioning script
 
     void Reset()
     {
@@ -36,12 +36,15 @@ public class FlockBehaviour : MonoBehaviour
 
     void Start()
     {
-        // Randomize obstacles placement.
+        //randomize obstacles placement.
         for (int i = 0; i < Obstacles.Length; ++i)
         {
+            //randomly position obstacles within the bounds
             float x = Random.Range(Bounds.bounds.min.x, Bounds.bounds.max.x);
             float y = Random.Range(Bounds.bounds.min.y, Bounds.bounds.max.y);
             Obstacles[i].transform.position = new Vector3(x, y, 0.0f);
+
+            //add Obstacle and Autonomous components to obstacle game objects
             Obstacle obs = Obstacles[i].AddComponent<Obstacle>();
             Autonomous autono = Obstacles[i].AddComponent<Autonomous>();
             autono.MaxSpeed = 1.0f;
@@ -49,11 +52,13 @@ public class FlockBehaviour : MonoBehaviour
             mObstacles.Add(obs);
         }
 
+        //create flocks and initialize flocking behaviors
         foreach (Flock flock in flocks)
         {
             CreateFlock(flock);
         }
 
+        //start coroutines for different flocking behaviors
         StartCoroutine(Coroutine_Flocking());
         StartCoroutine(Coroutine_Random());
         StartCoroutine(Coroutine_AvoidObstacles());
@@ -61,6 +66,7 @@ public class FlockBehaviour : MonoBehaviour
         StartCoroutine(Coroutine_Random_Motion_Obstacles());
     }
 
+    //create initial flock with random positions
     void CreateFlock(Flock flock)
     {
         for (int i = 0; i < flock.numBoids; ++i)
@@ -72,6 +78,7 @@ public class FlockBehaviour : MonoBehaviour
         }
     }
 
+    //update method for handling inputs and flocking rules
     void Update()
     {
         HandleInputs();
@@ -79,6 +86,7 @@ public class FlockBehaviour : MonoBehaviour
         Rule_CrossBorder_Obstacles();
     }
 
+    //handle keyboard inputs
     void HandleInputs()
     {
         if (EventSystem.current.IsPointerOverGameObject() || enabled == false)
@@ -86,12 +94,14 @@ public class FlockBehaviour : MonoBehaviour
             return;
         }
 
+        //add boids when space key is pressed
         if (Input.GetKeyDown(KeyCode.Space))
         {
             AddBoids(BoidIncr);
         }
     }
 
+    //add a specified number of boids with random positions to the flock
     void AddBoids(int count)
     {
         for (int i = 0; i < count; ++i)
@@ -104,6 +114,7 @@ public class FlockBehaviour : MonoBehaviour
         flocks[0].numBoids += count;
     }
 
+    //add a single boid with a specified position to the flock
     void AddBoid(float x, float y, Flock flock)
     {
         GameObject obj = Instantiate(flock.PrefabBoid);
@@ -115,11 +126,13 @@ public class FlockBehaviour : MonoBehaviour
         boid.RotationSpeed = flock.maxRotationSpeed;
     }
 
+    //calculate the Euclidean distance between two autonomous agents
     static float Distance(Autonomous a1, Autonomous a2)
     {
         return (a1.transform.position - a2.transform.position).magnitude;
     }
 
+    //execute flocking behaviors for a single boid
     void Execute(Flock flock, int i)
     {
         Vector3 flockDir = Vector3.zero;
@@ -180,6 +193,7 @@ public class FlockBehaviour : MonoBehaviour
             (steerPos - curr.transform.position) * (flock.useCohesionRule ? flock.weightCohesion : 0.0f);
     }
 
+    //coroutine for executing flocking behaviors
     IEnumerator Coroutine_Flocking()
     {
         int tasksPerFrame = 10;
@@ -192,6 +206,7 @@ public class FlockBehaviour : MonoBehaviour
                 {
                     List<Autonomous> autonomousList = flock.mAutonomous;
 
+                    //parallelize execution of flocking behaviors
                     for (int i = 0; i < autonomousList.Count; i += tasksPerFrame)
                     {
                         int endIndex = Mathf.Min(i + tasksPerFrame, autonomousList.Count);
@@ -272,14 +287,14 @@ public class FlockBehaviour : MonoBehaviour
                 {
                     List<Autonomous> autonomousList = flock.mAutonomous;
 
-                    // Iterate through each autonomous agent to find neighbors and avoid obstacles
+                    //iterate through each autonomous agent to find neighbors and avoid obstacles
                     for (int i = 0; i < autonomousList.Count; ++i)
                     {
-                        // Use spatial partitioning to find neighbors for the current autonomous agent
+                        //use spatial partitioning to find neighbors for the current autonomous agent
                         Vector3 currentPosition = autonomousList[i].transform.position;
                         List<int> neighbors = spatialPartitioning.FindNeighbors(currentPosition);
 
-                        // Loop through the neighbors and avoid obstacles
+                        //loop through the neighbors and avoid obstacles
                         foreach (int neighborIndex in neighbors)
                         {
                             AvoidObstacle(autonomousList, i, mObstacles, neighborIndex, flock);
